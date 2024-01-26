@@ -39,7 +39,7 @@ exports.loginUser = async (req, res, next) => {
       return next(new ErrorHandler("Please provide email and password", 400));
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return next(new ErrorHandler("User not found", 400));
     }
@@ -137,6 +137,60 @@ exports.resetPassword = async (req, res, next) => {
     next(error);
   }
 };
+
+// get currently logged in user details
+exports.getUserProfile = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+//change password
+exports.changePassword = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('+password');
+
+    //check old password
+    const isMatch = await user.comparePassword(req.body.oldPassword);
+    if (!isMatch) {
+      return next(new ErrorHandler("Old password is invalid!", 401));
+    }
+
+    user.password = req.body.password;
+    await user.save();
+    sendToken(user,200,res);
+
+  } catch (error) {
+    next(error);
+  }  
+};
+
+  //update user profile
+  exports.updateProfile= async (req, res, next)=>{
+    try {
+      const newData={
+        name:req.body.name,
+        email:req.body.email
+      }
+      const user = await User.findByIdAndUpdate(req.user._id, newData, {
+        new: true,
+        runValidators: true,
+        useFindAndModify: false,
+      });
+      res.status(200).json({
+        success: true,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
 // logout user
 exports.logoutUser = (req, res, next) => {
   res.cookie("token", null, {
@@ -147,4 +201,73 @@ exports.logoutUser = (req, res, next) => {
     success: true,
     message: "Successfully logged out",
   });
+};
+
+// get all users
+exports.getAllUsers = async (req, res, next) => {
+  try {
+    const users = await User.find();
+    res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+//Get user details
+exports.getUserDetails = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return next(new ErrorHandler(`User not found with id ${req.params.id}`, 404))
+    }
+    res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+//update user profile
+exports.updateUserDetails= async (req, res, next)=>{
+  try {
+    const newData={
+      name:req.body.name,
+      email:req.body.email,
+      role:req.body.role
+    }
+    const user = await User.findByIdAndUpdate(req.params.id, newData, {
+      new: true,
+      runValidators: true,
+      useFindAndModify: false,
+    });
+    res.status(200).json({
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+//delete user
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return next(new ErrorHandler(`User not found with id ${req.params.id}`, 404))
+    }
+
+    // Delete the user
+    await User.deleteOne({ _id: req.params.id });
+
+    res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
 };
